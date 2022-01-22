@@ -1,0 +1,22 @@
+---
+devices:
+  - vid: 6127
+    pid: 24647
+    macros:
+      - key: "A"
+        type: shell
+        command: "chromium"
+      - key: "B"
+        description: "Will run Ctrl+Alt+Delete"
+        type: shortcut
+        keys:
+          - "ControlLeft"
+          - "Alt"
+          - "Delete"
+      - key: "F"
+        description: "Runs format code in VSCode"
+        type: shortcut
+        keys:
+          - "ControlLeft"
+          - "ShiftLeft"
+          - "I"
