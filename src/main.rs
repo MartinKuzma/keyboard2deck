@@ -3,8 +3,6 @@ mod keyboard;
 mod macros;
 mod device;
 
-use std::io::BufRead;
-
 use app::App;
 use clap::Parser;
 

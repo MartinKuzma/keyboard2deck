@@ -27,7 +27,7 @@ impl Keyboard {
         }
     }
 
-    pub fn events(&mut self, buf: &[u8; 8], length: usize) -> Result<Vec<KeyEvent>, &str> {
+    pub fn events(&mut self, buf: &[u8; 8], length: usize) -> Vec<KeyEvent> {
         let mut events = Vec::new();
 
         for n in 2..length {
@@ -45,9 +45,6 @@ impl Keyboard {
                     continue;
                 }
             };
-
-            print!("Key {:?} ",key);
-            
 
             if self.map_previous_state(&key) {
                 continue;
@@ -80,9 +77,7 @@ impl Keyboard {
             }
         }
 
-        println!("B {:?}", self.previous_events);
-
-        return Result::Ok(events);
+        return events;
     }
 
     fn map_previous_state(&mut self, key_code: &Key) -> bool {

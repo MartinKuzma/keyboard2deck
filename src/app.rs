@@ -1,24 +1,20 @@
-use hidapi::{self, HidDevice};
+use hidapi;
 use signal_hook::consts::SIGINT;
 use signal_hook::iterator::Signals;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 use std::{
-    collections::HashMap,
     fs::{self},
     sync::Arc,
     thread,
 };
 use yaml_rust::yaml;
 
-use crate::device;
-use crate::device::MacrosBinding;
 use crate::device::Device;
 use crate::device::DeviceConfig;
-use crate::{
-    macros::{self, shell::ShellMacro, shortcut::ShortCut, Macro},
-};
+use crate::device::MacrosBinding;
+use crate::macros::{self, shell::ShellMacro, shortcut::ShortCut};
 
 pub struct App {
     hid_api: Arc<Mutex<hidapi::HidApi>>,

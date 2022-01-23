@@ -1,4 +1,11 @@
-use std::{collections::HashMap, sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}}, thread};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    collections::HashMap,
+    thread,
+};
 
 use hidapi::{HidDevice, HidError};
 
@@ -35,16 +42,15 @@ impl Device {
                 continue;
             }
 
-            match self.open_device() {
-                Ok(hid_device) => self.process_events(hid_device, &running),
-                Err(_) => {
-                    println!(
-                        "cannot open device: {} {}",
-                        self.config.vid, self.config.pid
-                    );
-                    thread::sleep(wait_duration);
-                    continue;
-                }
+            if let Ok(hid_device) = self.open_device() {
+                self.process_events(hid_device, &running);
+            } else {
+                println!(
+                    "cannot open device: {} {}",
+                    self.config.vid, self.config.pid
+                );
+                thread::sleep(wait_duration);
+                continue;
             }
         }
     }
@@ -72,18 +78,21 @@ impl Device {
 
         while running.load(Ordering::Relaxed) {
             let mut buf = [0u8; 8];
-            let res = hid_device.read_timeout(&mut buf[..], 2500).unwrap();
+            let res = if let Ok(r) = hid_device.read_timeout(&mut buf[..], 2500) {
+                r
+            } else {
+                println!("Error while reading from device");
+                return;
+            };
 
             if res == 0 {
                 continue;
             }
 
-            for event in keyboard.events(&buf, res).unwrap() {
+            for event in keyboard.events(&buf, res) {
                 if event.event_type == keyboard::KeyEventType::PRESSED {
                     continue;
                 }
-
-                println!("{:?}", event.key);
 
                 match self.config.macros.get(&event.key) {
                     Some(m) => m.execute(),
