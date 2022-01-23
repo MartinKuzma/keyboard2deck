@@ -53,7 +53,7 @@ devices:
         keys:
           - "ControlLeft"
           - "ShiftLeft"
-          - "KeyI"
+          - "I"
 ```
 
 ## Supported keys

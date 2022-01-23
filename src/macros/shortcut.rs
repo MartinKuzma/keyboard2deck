@@ -25,7 +25,7 @@ impl ShortCut {
         let mut parsed_keys: Vec<rdev::Key> = Vec::new();
 
         for key_str in keys.iter() {
-            let key : keyboard::Key = match serde_yaml::from_str(&key_str) {
+            let key: keyboard::Key = match serde_yaml::from_str(&key_str) {
                 Ok(k) => k,
                 Err(_) => panic!("Error while parsing key for shortcuts macro: {}", key_str),
             };
@@ -33,7 +33,7 @@ impl ShortCut {
             match key.try_into_rdev() {
                 Ok(k) => parsed_keys.push(k),
                 Err(_) => panic!("Unsupported key {}", key_str),
-            }            
+            }
         }
 
         return Ok(ShortCut { keys: parsed_keys });

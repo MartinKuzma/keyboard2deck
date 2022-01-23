@@ -1,6 +1,9 @@
 mod app;
 mod keyboard;
 mod macros;
+mod device;
+
+use std::io::BufRead;
 
 use app::App;
 use clap::Parser;
@@ -22,6 +25,6 @@ fn main() {
         return;
     }
 
-    let mut app = App::new(String::from("config.yaml")).unwrap();
+    let mut app = App::new(args.config.unwrap()).unwrap();
     app.run().unwrap();
 }

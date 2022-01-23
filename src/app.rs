@@ -1,5 +1,9 @@
-use hidapi;
-use hidapi::HidError;
+use hidapi::{self, HidDevice};
+use signal_hook::consts::SIGINT;
+use signal_hook::iterator::Signals;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 use std::{
     collections::HashMap,
     fs::{self},
@@ -8,30 +12,25 @@ use std::{
 };
 use yaml_rust::yaml;
 
+use crate::device;
+use crate::device::MacrosBinding;
+use crate::device::Device;
+use crate::device::DeviceConfig;
 use crate::{
-    keyboard,
     macros::{self, shell::ShellMacro, shortcut::ShortCut, Macro},
 };
 
-type MacrosBinding = HashMap<keyboard::Key, Arc<dyn Macro + Send>>;
-
-#[derive(Clone)]
-pub struct Device {
-    pub vid: u16,
-    pub pid: u16,
-    pub macros: MacrosBinding,
-}
-
 pub struct App {
-    hid_api: Arc<hidapi::HidApi>,
-    devices: Vec<Device>,
+    hid_api: Arc<Mutex<hidapi::HidApi>>,
+    devices: Vec<DeviceConfig>,
 }
 
 impl App {
-    pub fn new(configuration: String) -> Result<App, HidError> {
+    pub fn new(configuration: String) -> Result<App, ()> {
         let content = fs::read_to_string(configuration).unwrap();
+
         let mut app = App {
-            hid_api: Arc::new(hidapi::HidApi::new().unwrap()),
+            hid_api: Arc::new(Mutex::new(hidapi::HidApi::new().unwrap())),
             devices: Vec::new(),
         };
 
@@ -39,16 +38,25 @@ impl App {
         Ok(app)
     }
 
-    pub fn run(&mut self) -> Result<(), &str> {
+    pub fn run(&mut self) -> Result<(), ()> {
         let mut threads = Vec::new();
+        let running = Arc::new(AtomicBool::new(true));
 
-        for device in self.devices.iter() {
+        // Run devices in separate threads
+        while self.devices.len() > 0 {
+            let device_config = self.devices.pop().unwrap();
             let api = self.hid_api.clone();
-            let cloned_device = device.clone();
-
+            let device_running = running.clone();
             threads.push(thread::spawn(move || {
-                App::listen_to_device(api, cloned_device);
+                Device::new(device_config, api).listen(device_running);
             }));
+        }
+
+        let mut signals = Signals::new(&[SIGINT]).unwrap();
+        for _ in signals.forever() {
+            println!("Closing application");
+            running.store(false, Ordering::Relaxed);
+            break;
         }
 
         for thread in threads.into_iter() {
@@ -58,27 +66,6 @@ impl App {
         Ok(())
     }
 
-    fn listen_to_device(api: Arc<hidapi::HidApi>, device: Device) {
-        let hid_device = api.open(device.vid, device.pid).unwrap();
-        let mut keyboard = keyboard::Keyboard::new();
-
-        loop {
-            let mut buf = [0u8; 8];
-            let res = hid_device.read(&mut buf[..]).unwrap();
-
-            for event in keyboard.events(&buf, res).unwrap() {
-                if event.event_type == keyboard::KeyEventType::PRESSED {
-                    continue;
-                }
-
-                match device.macros.get(&event.key) {
-                    Some(m) => m.execute(),
-                    None => {}
-                }
-            }
-        }
-    }
-
     fn parse_config(&mut self, config: String) -> Result<(), &str> {
         let docs = yaml_rust::YamlLoader::load_from_str(&config).unwrap();
         let doc = &docs[0];
@@ -86,14 +73,13 @@ impl App {
         let devices_yml = doc["devices"].as_vec().unwrap();
 
         for device_yml in devices_yml.iter() {
-            let device = Device {
+            let device = DeviceConfig {
                 vid: u16::try_from(device_yml["vid"].as_i64().unwrap())
                     .expect("Cannot parse vid value in device element!"),
                 pid: u16::try_from(device_yml["pid"].as_i64().unwrap())
                     .expect("Cannot parse pid value in device element!"),
                 macros: App::parse_macros(&device_yml["macros"]),
             };
-
             self.devices.push(device);
         }
 
@@ -105,7 +91,7 @@ impl App {
 
         for m in macros_yml.as_vec().unwrap().iter() {
             let key = serde_yaml::from_str(m["key"].as_str().unwrap()).unwrap();
-            let macro_type = m["type"].as_str().unwrap();
+            let macro_type = m["type"].as_str().expect("Missing type in macros.");
 
             let parsed_macro: Arc<dyn macros::Macro + Send> = match macro_type {
                 "shell" => Arc::new(ShellMacro {
@@ -115,7 +101,7 @@ impl App {
                     ShortCut::new(
                         m["keys"]
                             .as_vec()
-                            .unwrap()
+                            .expect("Missing keys in element")
                             .iter()
                             .map(|v| String::from(v.as_str().unwrap()))
                             .collect(),

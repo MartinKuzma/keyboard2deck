@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::result::Result;
 
-
 const KEY_ERR_OVF: u8 = 0x01;
 
 #[derive(Debug, PartialEq)]
@@ -47,6 +46,9 @@ impl Keyboard {
                 }
             };
 
+            print!("Key {:?} ",key);
+            
+
             if self.map_previous_state(&key) {
                 continue;
             }
@@ -58,10 +60,11 @@ impl Keyboard {
         }
 
         // Check for released keys
-        for val in self.previous_events.iter_mut() {
+        for val in self.previous_events.iter() {
             if *val == Key::Unknown {
                 continue;
             }
+
             events.push(KeyEvent {
                 key: val.clone(),
                 event_type: KeyEventType::RELEASED,
@@ -72,8 +75,12 @@ impl Keyboard {
         self.previous_events.clear();
         //Set current keys as previous state
         for event in events.iter() {
-            self.previous_events.push(event.key.clone());
+            if event.event_type == KeyEventType::PRESSED {
+                self.previous_events.push(event.key.clone());
+            }
         }
+
+        println!("B {:?}", self.previous_events);
 
         return Result::Ok(events);
     }
@@ -370,5 +377,3 @@ impl Key {
         }
     }
 }
-
-

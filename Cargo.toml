@@ -10,3 +10,4 @@ yaml-rust = "0.4.5"
 rdev= {version = "*", features = ["serialize"] }
 serde_yaml="*"
 serde="*"
+signal-hook = "0.3.13"
