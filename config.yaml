@@ -18,8 +18,11 @@ devices:
             - "ShiftLeft"
             - "I"
       - key: "W"
-        description: "Chromium"
+        description: "Open gnome-terminal"
         shell:
-          uid: 1000 # Only available in Unix/Linux
-          command: "chromium"
+          uid: 1000 # only on linux
+          command: "gnome-terminal"
           args: []
+          envs:
+            DISPLAY: ":0"
+            HOME: /home/martin/
