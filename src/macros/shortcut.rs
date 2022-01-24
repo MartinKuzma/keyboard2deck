@@ -1,5 +1,4 @@
 use rdev::{simulate, EventType, SimulateError};
-use std::io::Error;
 
 use super::Macro;
 use crate::keyboard;
@@ -21,22 +20,17 @@ impl Macro for ShortCut {
 }
 
 impl ShortCut {
-    pub fn new(keys: Vec<String>) -> Result<ShortCut, Error> {
+    pub fn new(keys: Vec<keyboard::Key>) -> ShortCut {
         let mut parsed_keys: Vec<rdev::Key> = Vec::new();
 
-        for key_str in keys.iter() {
-            let key: keyboard::Key = match serde_yaml::from_str(&key_str) {
-                Ok(k) => k,
-                Err(_) => panic!("Error while parsing key for shortcuts macro: {}", key_str),
-            };
-
+        for key in keys.iter() {
             match key.try_into_rdev() {
                 Ok(k) => parsed_keys.push(k),
-                Err(_) => panic!("Unsupported key {}", key_str),
+                Err(_) => panic!("Unsupported key in configuration"),
             }
         }
 
-        return Ok(ShortCut { keys: parsed_keys });
+        return ShortCut { keys: parsed_keys };
     }
 
     fn send(event_type: &EventType) {

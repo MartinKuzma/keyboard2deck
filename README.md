@@ -3,6 +3,12 @@ Turn your old keyboards into customizable decks. Assign shortcuts or command to 
 
 Project was created after I became fatiqued by repetitive actions. Dedicated streaming decks however seemed a bit expensive solution, especially considering that I already have functioning keyboards I don't use. Application si written in Rust.
 
+## Build dependencies
+### Linux
+- pkg-config
+- libx11-dev
+- libxtst-dev
+
 ## Features
 - List HID USB Devices
 - Setup different macros on multiple devices
@@ -26,8 +32,8 @@ cargo build
 #list all devices
 ./keyboard2deck -l 
 #find out which device you are interested in and set it in configuration file
-#run as service
-./keyboard2deck -c config.yaml
+#run as sudo to obtain device
+sudo ./keyboard2deck -c config.yaml
 ```
 
 ## Example configuration
@@ -37,23 +43,26 @@ devices:
   - vid: 6127
     pid: 24647
     macros:
-      - key: "A"
-        type: shell
-        command: "chromium"
       - key: "B"
-        description: "Runs Ctrl+Alt+Delete"
-        type: shortcut
-        keys:
-          - "ControlLeft"
-          - "Alt"
-          - "Delete"
+        description: "Will run Ctrl+Alt+Delete"
+        shortcut: 
+          keys:
+            - "ControlLeft"
+            - "Alt"
+            - "Delete"
       - key: "F"
         description: "Runs format code in VSCode"
-        type: shortcut
-        keys:
-          - "ControlLeft"
-          - "ShiftLeft"
-          - "I"
+        shortcut:
+          keys:
+            - "ControlLeft"
+            - "ShiftLeft"
+            - "I"
+      - key: "W"
+        description: "Opens chromium as my home user"
+        shell:
+          uid: 1000 # Only available in Unix/Linux
+          command: "chromium"
+          args: []
 ```
 
 ## Supported keys

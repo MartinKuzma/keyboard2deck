@@ -1,7 +1,10 @@
 mod app;
+mod config;
+mod device;
 mod keyboard;
 mod macros;
-mod device;
+
+use std::fs;
 
 use app::App;
 use clap::Parser;
@@ -23,6 +26,9 @@ fn main() {
         return;
     }
 
-    let mut app = App::new(args.config.unwrap()).unwrap();
+    let config_content = fs::read_to_string(args.config.unwrap()).unwrap();
+    let configuration: config::Config = serde_yaml::from_str(config_content.as_str()).unwrap();
+
+    let mut app = App::new(configuration).unwrap();
     app.run().unwrap();
 }

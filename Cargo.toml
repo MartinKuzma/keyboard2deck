@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 clap = { version = "3.0.10", features = ["derive"] }
 hidapi = "1.3.2"
-yaml-rust = "0.4.5"
 rdev= {version = "*", features = ["serialize"] }
 serde_yaml="*"
 serde="*"

@@ -1,34 +1,34 @@
+use crate::{keyboard, macros::Macro};
+use hidapi::{HidDevice, HidError};
 use std::{
+    collections::HashMap,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
-    collections::HashMap,
     thread,
 };
 
-use hidapi::{HidDevice, HidError};
-
-use crate::{keyboard, macros::Macro};
-
-pub type MacrosBinding = HashMap<keyboard::Key, Arc<dyn Macro + Send>>;
-
-#[derive(Clone)]
-pub struct DeviceConfig {
-    pub vid: u16,
-    pub pid: u16,
-    pub macros: MacrosBinding,
-}
+pub type MacrosBinding = HashMap<keyboard::Key, Box<dyn Macro + Send>>;
 
 pub struct Device {
-    config: DeviceConfig,
+    vid: u16,
+    pid: u16,
+    macros: MacrosBinding,
     hid_api: Arc<Mutex<hidapi::HidApi>>,
 }
 
 impl Device {
-    pub fn new(config: DeviceConfig, hid_api: Arc<Mutex<hidapi::HidApi>>) -> Device {
+    pub fn new(
+        vid: u16,
+        pid: u16,
+        macros: MacrosBinding,
+        hid_api: Arc<Mutex<hidapi::HidApi>>,
+    ) -> Device {
         Device {
-            config: config,
+            vid: vid,
+            pid: pid,
+            macros: macros,
             hid_api: hid_api,
         }
     }
@@ -45,10 +45,7 @@ impl Device {
             if let Ok(hid_device) = self.open_device() {
                 self.process_events(hid_device, &running);
             } else {
-                println!(
-                    "cannot open device: {} {}",
-                    self.config.vid, self.config.pid
-                );
+                println!("cannot open device: {} {}", self.vid, self.pid);
                 thread::sleep(wait_duration);
                 continue;
             }
@@ -57,7 +54,7 @@ impl Device {
 
     pub fn open_device(&mut self) -> Result<HidDevice, HidError> {
         let api = self.hid_api.lock().unwrap();
-        api.open(self.config.vid, self.config.pid)
+        api.open(self.vid, self.pid)
     }
 
     pub fn is_present(&mut self) -> bool {
@@ -65,7 +62,7 @@ impl Device {
         api.refresh_devices().unwrap();
 
         for device in api.device_list() {
-            if device.vendor_id() == self.config.vid && device.product_id() == self.config.pid {
+            if device.vendor_id() == self.vid && device.product_id() == self.pid {
                 return true;
             }
         }
@@ -94,7 +91,7 @@ impl Device {
                     continue;
                 }
 
-                match self.config.macros.get(&event.key) {
+                match self.macros.get(&event.key) {
                     Some(m) => m.execute(),
                     None => {}
                 }

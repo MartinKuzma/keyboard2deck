@@ -1,36 +1,34 @@
 use hidapi;
 use signal_hook::consts::SIGINT;
 use signal_hook::iterator::Signals;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
-use std::sync::Mutex;
+use std::collections::HashMap;
 use std::{
-    fs::{self},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     thread,
 };
-use yaml_rust::yaml;
 
+use crate::config;
+use crate::config::Config;
 use crate::device::Device;
-use crate::device::DeviceConfig;
-use crate::device::MacrosBinding;
-use crate::macros::{self, shell::ShellMacro, shortcut::ShortCut};
+use crate::macros::{self, shortcut::ShortCut};
 
 pub struct App {
     hid_api: Arc<Mutex<hidapi::HidApi>>,
-    devices: Vec<DeviceConfig>,
+    devices: Vec<Device>,
 }
 
 impl App {
-    pub fn new(configuration: String) -> Result<App, ()> {
-        let content = fs::read_to_string(configuration).unwrap();
-
+    pub fn new(configuration: Config) -> Result<App, ()> {
         let mut app = App {
             hid_api: Arc::new(Mutex::new(hidapi::HidApi::new().unwrap())),
             devices: Vec::new(),
         };
 
-        app.parse_config(content).unwrap();
+        app.init(configuration);
+
         Ok(app)
     }
 
@@ -40,11 +38,10 @@ impl App {
 
         // Run devices in separate threads
         while self.devices.len() > 0 {
-            let device_config = self.devices.pop().unwrap();
-            let api = self.hid_api.clone();
-            let device_running = running.clone();
+            let mut device = self.devices.pop().unwrap();
+            let running = running.clone();
             threads.push(thread::spawn(move || {
-                Device::new(device_config, api).listen(device_running);
+                device.listen(running);
             }));
         }
 
@@ -62,55 +59,26 @@ impl App {
         Ok(())
     }
 
-    fn parse_config(&mut self, config: String) -> Result<(), &str> {
-        let docs = yaml_rust::YamlLoader::load_from_str(&config).unwrap();
-        let doc = &docs[0];
+    fn init(&mut self, config: Config) {
+        for conf_device in config.devices {
+            let mut macros = HashMap::new();
+            for conf_macro in conf_device.macros {
+                let macr: Box<dyn macros::Macro + Send> = match conf_macro.oneof_macro {
+                    config::OneOfMacros::Shell(shell_macro) => Box::new(shell_macro),
+                    config::OneOfMacros::Shortcut(shortcut_config) => {
+                        Box::new(ShortCut::new(shortcut_config.keys))
+                    }
+                };
+                macros.insert(conf_macro.key.clone(), macr);
+            }
 
-        let devices_yml = doc["devices"].as_vec().unwrap();
-
-        for device_yml in devices_yml.iter() {
-            let device = DeviceConfig {
-                vid: u16::try_from(device_yml["vid"].as_i64().unwrap())
-                    .expect("Cannot parse vid value in device element!"),
-                pid: u16::try_from(device_yml["pid"].as_i64().unwrap())
-                    .expect("Cannot parse pid value in device element!"),
-                macros: App::parse_macros(&device_yml["macros"]),
-            };
-            self.devices.push(device);
+            self.devices.push(Device::new(
+                conf_device.vid,
+                conf_device.pid,
+                macros,
+                self.hid_api.clone(),
+            ));
         }
-
-        Ok(())
-    }
-
-    fn parse_macros(macros_yml: &yaml::Yaml) -> MacrosBinding {
-        let mut macros_binding = MacrosBinding::new();
-
-        for m in macros_yml.as_vec().unwrap().iter() {
-            let key = serde_yaml::from_str(m["key"].as_str().unwrap()).unwrap();
-            let macro_type = m["type"].as_str().expect("Missing type in macros.");
-
-            let parsed_macro: Arc<dyn macros::Macro + Send> = match macro_type {
-                "shell" => Arc::new(ShellMacro {
-                    command: String::from(m["command"].as_str().unwrap()),
-                }),
-                "shortcut" => Arc::new(
-                    ShortCut::new(
-                        m["keys"]
-                            .as_vec()
-                            .expect("Missing keys in element")
-                            .iter()
-                            .map(|v| String::from(v.as_str().unwrap()))
-                            .collect(),
-                    )
-                    .unwrap(),
-                ),
-                unknown => panic!("Incorrect macro type: {}", unknown),
-            };
-
-            macros_binding.insert(key, parsed_macro);
-        }
-
-        macros_binding
     }
 }
 
