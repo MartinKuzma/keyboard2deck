@@ -10,3 +10,5 @@ rdev= {version = "*", features = ["serialize"] }
 serde_yaml="*"
 serde="*"
 signal-hook = "0.3.13"
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"

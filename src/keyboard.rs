@@ -27,7 +27,7 @@ impl Keyboard {
         }
     }
 
-    pub fn events(&mut self, buf: &[u8; 8], length: usize) -> Vec<KeyEvent> {
+    pub fn events(&mut self, buf: &[u8; 18], length: usize) -> Vec<KeyEvent> {
         let mut events = Vec::new();
 
         for n in 2..length {

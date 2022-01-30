@@ -33,6 +33,8 @@ impl Macro for ShellMacro {
 
     #[cfg(any(target_os = "windows"))]
     fn execute(&self) {
-        let _ = Command::new(self.command).args(self.args).spawn();
+        let _ = Command::new(&self.command)
+            .args(&self.args)
+            .spawn();
     }
 }

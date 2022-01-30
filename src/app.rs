@@ -1,10 +1,10 @@
 use hidapi;
-use signal_hook::consts::SIGINT;
-use signal_hook::iterator::Signals;
+use signal_hook::consts::signal;
+
 use std::collections::HashMap;
 use std::{
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::AtomicBool,
         Arc, Mutex,
     },
     thread,
@@ -34,27 +34,24 @@ impl App {
 
     pub fn run(&mut self) -> Result<(), ()> {
         let mut threads = Vec::new();
-        let running = Arc::new(AtomicBool::new(true));
+        let stop = Arc::new(AtomicBool::new(false));
 
         // Run devices in separate threads
         while self.devices.len() > 0 {
             let mut device = self.devices.pop().unwrap();
-            let running = running.clone();
+            let stop = stop.clone();
             threads.push(thread::spawn(move || {
-                device.listen(running);
+                device.listen(stop);
             }));
         }
 
-        let mut signals = Signals::new(&[SIGINT]).unwrap();
-        for _ in signals.forever() {
-            println!("Closing application");
-            running.store(false, Ordering::Relaxed);
-            break;
-        }
+        signal_hook::flag::register(signal::SIGTERM, stop.clone()).unwrap();
+        signal_hook::flag::register(signal::SIGINT, stop.clone()).unwrap();
 
         for thread in threads.into_iter() {
             thread.join().unwrap();
         }
+        println!("Closing application");
 
         Ok(())
     }
@@ -88,9 +85,11 @@ pub fn list_devices() {
     println!("Found HID USB devices:\n");
 
     for device in hid_api.device_list() {
+        
         println!(
-            "SN:{:#?}\tVID: {}\t PID: {}\t\tNAME: {}",
+            "SN:{:#?} {}\tVID: {}\t PID: {}\t\tNAME: {}",
             device.serial_number().unwrap_or("N/A"),
+            device.usage(),            
             device.vendor_id(),
             device.product_id(),
             device.product_string().unwrap_or("N/A")
